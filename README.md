@@ -3,15 +3,6 @@
 This private repository contains an employer-facing, cleaned version of a skin
 lesion classification project based on multimodal learning.
 
-## Source Reference
-
-Original public project notebook:
-
-[MU-Data-Science/Skin-Lesion-Classification - multimodal_training.ipynb](https://github.com/MU-Data-Science/Skin-Lesion-Classification/blob/main/multimodal_training.ipynb)
-
-The original notebook was reorganized into a reusable Python script and cleaned
-to remove hardcoded local paths, notebook-only commands, and machine-specific
-references.
 
 ## Research Publication
 
