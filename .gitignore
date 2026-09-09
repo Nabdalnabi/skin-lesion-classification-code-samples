@@ -1,0 +1,46 @@
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Data and image files
+data/
+datasets/
+images/
+*.csv
+*.tsv
+*.xlsx
+*.xls
+*.jpg
+*.jpeg
+*.png
+
+# Model artifacts
+models/
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+*.onnx
+
+# Generated outputs
+outputs/
+figures/
+reports/
+*.pdf
+
+# Notebook artifacts
+.ipynb_checkpoints/
+*_original.ipynb
+
+# Secrets and environment files
+.env
+.env.*
+secrets/
+
+# OS files
+.DS_Store
