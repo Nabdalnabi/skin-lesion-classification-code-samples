@@ -22,7 +22,7 @@ import torch.nn as nn
 import torchvision.transforms as transforms
 from PIL import Image
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-from sklearn.model_selection import train_test_split
+from split_utils import split_data
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from transformers import AutoModel, AutoTokenizer
@@ -38,6 +38,7 @@ def parse_args():
     parser.add_argument("--metadata", default="HAM10000_metadata.csv", help="Metadata CSV filename")
     parser.add_argument("--image-id-col", default="image_id", help="Image ID column")
     parser.add_argument("--label-col", default="dx", help="Class label column")
+    parser.add_argument("--group-col", default="lesion_id", help="Use patient ID when available; otherwise lesion ID")
     parser.add_argument("--epochs", type=int, default=20, help="Training epochs")
     parser.add_argument("--batch-size", type=int, default=16, help="Batch size")
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
@@ -75,6 +76,8 @@ def build_image_lookup(data_dir):
     lookup = {}
     for path in data_dir.rglob("*"):
         if path.suffix.lower() in {".jpg", ".jpeg", ".png"}:
+            if path.stem in lookup:
+                raise ValueError("Duplicate image stems; resolve ambiguous image paths.")
             lookup[path.stem] = str(path)
     return lookup
 
@@ -84,7 +87,7 @@ def build_text_context(df):
     if not context_cols:
         return pd.Series(["skin lesion image"] * len(df), index=df.index)
 
-    text = df[context_cols].fillna("unknown").astype(str).agg(" ".join, axis=1)
+    text = df[context_cols].astype("string").fillna("unknown").agg(" ".join, axis=1)
     return text.replace("", "skin lesion image")
 
 
@@ -104,7 +107,10 @@ def load_metadata(data_dir, metadata_filename, image_id_col, label_col):
 
     image_lookup = build_image_lookup(data_dir)
     df["image_path"] = df[image_id_col].astype(str).map(image_lookup)
-    df = df.dropna(subset=["image_path", label_col]).copy()
+    if df[["image_path", label_col]].isna().any().any():
+        raise ValueError("Missing images or labels; no records were silently removed.")
+    if df[image_id_col].duplicated().any():
+        raise ValueError("Duplicate image IDs in metadata.")
     df["text"] = build_text_context(df)
 
     label_names = sorted(df[label_col].astype(str).unique())
@@ -113,22 +119,6 @@ def load_metadata(data_dir, metadata_filename, image_id_col, label_col):
     df["label_id"] = df[label_col].astype(str).map(label_to_id)
 
     return df, label_to_id, id_to_label
-
-
-def split_data(df, seed):
-    train_df, temp_df = train_test_split(
-        df,
-        test_size=0.30,
-        random_state=seed,
-        stratify=df["label_id"],
-    )
-    valid_df, test_df = train_test_split(
-        temp_df,
-        test_size=0.50,
-        random_state=seed,
-        stratify=temp_df["label_id"],
-    )
-    return train_df.reset_index(drop=True), valid_df.reset_index(drop=True), test_df.reset_index(drop=True)
 
 
 # -----------------------------
@@ -260,12 +250,12 @@ def run_epoch(model, loader, criterion, optimizer, device, train=True):
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                 optimizer.step()
 
-            losses.append(float(loss.item()))
+            losses.append(float(loss.item()) * len(y))
             predictions.extend(logits.argmax(dim=1).detach().cpu().numpy())
             labels.extend(y.detach().cpu().numpy())
 
     return {
-        "loss": float(np.mean(losses)),
+        "loss": float(sum(losses) / len(labels)),
         "accuracy": accuracy_score(labels, predictions),
     }
 
@@ -289,9 +279,9 @@ def evaluate(model, loader, id_to_label, device):
     target_names = [id_to_label[i] for i in sorted(id_to_label)]
     print("Test accuracy:", round(accuracy_score(labels, predictions), 4))
     print("\nConfusion matrix")
-    print(confusion_matrix(labels, predictions))
+    print(confusion_matrix(labels, predictions, labels=sorted(id_to_label)))
     print("\nClassification report")
-    print(classification_report(labels, predictions, target_names=target_names, zero_division=0))
+    print(classification_report(labels, predictions, labels=sorted(id_to_label), target_names=target_names, zero_division=0))
 
 
 def main():
@@ -306,7 +296,7 @@ def main():
         args.image_id_col,
         args.label_col,
     )
-    train_df, valid_df, test_df = split_data(df, args.seed)
+    train_df, valid_df, test_df = split_data(df, args.seed, args.group_col)
 
     print(f"Classes: {label_to_id}")
     print(f"Train/valid/test sizes: {len(train_df)}, {len(valid_df)}, {len(test_df)}")
