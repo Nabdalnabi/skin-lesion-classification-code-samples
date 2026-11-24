@@ -1,5 +1,7 @@
 # Multimodal Skin Lesion Classification
 
+[![tests](https://github.com/Nabdalnabi/skin-lesion-classification-code-samples/actions/workflows/tests.yml/badge.svg)](https://github.com/Nabdalnabi/skin-lesion-classification-code-samples/actions/workflows/tests.yml)
+
 Research code sample from collaborative work on skin-lesion classification,
 organized into configuration, data preparation, dataset, model, and training blocks.
 
@@ -54,8 +56,8 @@ under their own access and licensing conditions; no images or metadata are bundl
 
 ## Validation and limitations
 
-A synthetic grouping test checks partition separation. Full image-model training
-and paper reproduction have not been validated in this preparation environment.
+A synthetic grouping test checks partition separation. The paper's reported
+results are not reproduced by this simplified sample.
 The script reports results to the console; it does not persist trained weights.
 Lesion separation is not patient separation when several lesions belong to the
 same person. Class imbalance, demographic bias, external validation, calibration,
